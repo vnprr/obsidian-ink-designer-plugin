@@ -1,99 +1,169 @@
-import {App, Editor, MarkdownView, Modal, Notice, Plugin} from 'obsidian';
-import {DEFAULT_SETTINGS, MyPluginSettings, SampleSettingTab} from "./settings";
+import { Notice, Plugin, TFile } from "obsidian";
+import type { Story } from "inkjs/full";
+import { InkDesignerSettings, DEFAULT_SETTINGS, InkDesignerSettingsTab } from "./ui/settings-tab";
+import { InkPlayerView, INK_PLAYER_VIEW_TYPE } from "./ui/ink-player-view";
+import { buildStoryProject, getProjectForFile } from "./core/story-graph";
+import { transpileStory } from "./transpiler/md-to-ink";
+import { compileInk } from "./core/story-compiler";
+import { slugify } from "./core/slug";
+import { t } from "./i18n/index";
+import { registerContextMenu } from "./commands/context-menu";
+import { registerTemplateCommands } from "./commands/templates";
+import { InkVariableSuggest } from "./ui/variable-suggest";
+import { registerMarkdownDecorator } from "./ui/md-decorator";
 
-// Remember to rename these classes and interfaces!
-
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+export default class InkDesignerPlugin extends Plugin {
+	settings: InkDesignerSettings;
 
 	async onload() {
 		await this.loadSettings();
 
-		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('dice', 'Sample', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
+		// Register the Ink Player view
+		this.registerView(
+			INK_PLAYER_VIEW_TYPE,
+			(leaf) => new InkPlayerView(leaf)
+		);
 
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status bar text');
-
-		// This adds a simple command that can be triggered anywhere
+		// Command: Play Ink from start
 		this.addCommand({
-			id: 'open-modal-simple',
-			name: 'Open modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			}
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'replace-selected',
-			name: 'Replace selected content',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				editor.replaceSelection('Sample editor command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-modal-complex',
-			name: 'Open modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-				return false;
-			}
+			id: "play-ink-story",
+			name: t("cmd.playStory"),
+			callback: () => this.playFromStart(),
 		});
 
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
+		// Register settings tab
+		this.addSettingTab(new InkDesignerSettingsTab(this.app, this));
 
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			new Notice("Click");
+		// Register context menu + template commands
+		registerContextMenu(this);
+		registerTemplateCommands(this);
+
+		// Register variable autocomplete
+		this.registerEditorSuggest(new InkVariableSuggest(this.app, this));
+
+		// Register markdown decorations
+		registerMarkdownDecorator(this);
+
+		// Ribbon icon
+		this.addRibbonIcon("play-circle", t("menu.playFromStart"), () => {
+			this.playFromStart();
 		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
-
 	}
 
-	onunload() {
+	onunload() {}
+
+	async playFromStart(): Promise<void> {
+		const project = await buildStoryProject(
+			this.app,
+			this.settings.defaultProject,
+			this.settings.storyFolder
+		);
+
+		if (!project.globalsNote) {
+			new Notice(t("error.noGlobals"));
+			return;
+		}
+
+		if (!project.startKnotId) {
+			new Notice(t("error.noStart"));
+			return;
+		}
+
+		const transpiled = transpileStory(project.globalsNote, project.knotNotes, {
+			choiceMode: this.settings.choiceMode,
+		});
+
+		if (transpiled.warnings.length > 0) {
+			console.warn("Ink transpile warnings:", transpiled.warnings);
+		}
+
+		const compiled = compileInk(transpiled.inkSource);
+
+		if (compiled.errors.length > 0) {
+			new Notice(t("error.compile", { message: compiled.errors[0] ?? "unknown" }));
+			console.error("Ink compilation errors:", compiled.errors);
+			console.error("Ink source:\n", compiled.inkSource);
+			return;
+		}
+
+		if (!compiled.story) {
+			new Notice(t("error.compileFailed"));
+			return;
+		}
+
+		const startPath = slugify(project.startKnotId);
+		await this.activatePlayerView(compiled.story, startPath);
+	}
+
+	async playFromFile(file: TFile): Promise<void> {
+		const projectName = getProjectForFile(
+			this.app,
+			file,
+			this.settings.defaultProject
+		);
+
+		const project = await buildStoryProject(
+			this.app,
+			projectName,
+			this.settings.storyFolder
+		);
+
+		const transpiled = transpileStory(project.globalsNote, project.knotNotes, {
+			choiceMode: this.settings.choiceMode,
+		});
+
+		const compiled = compileInk(transpiled.inkSource);
+
+		if (compiled.errors.length > 0) {
+			new Notice(t("error.compile", { message: compiled.errors[0] ?? "unknown" }));
+			console.error("Ink compilation errors:", compiled.errors);
+			return;
+		}
+
+		if (!compiled.story) {
+			new Notice(t("error.compileFailed"));
+			return;
+		}
+
+		const cache = this.app.metadataCache.getFileCache(file);
+		const fm = cache?.frontmatter;
+		const knotId = (fm?.["ink-id"] as string) ?? slugify(file.basename);
+
+		await this.activatePlayerView(compiled.story, knotId);
+	}
+
+	private async activatePlayerView(
+		story: Story,
+		startPath: string
+	): Promise<void> {
+		let leaf = this.app.workspace.getLeavesOfType(INK_PLAYER_VIEW_TYPE)[0];
+		if (!leaf) {
+			const rightLeaf = this.app.workspace.getRightLeaf(false);
+			if (rightLeaf) {
+				await rightLeaf.setViewState({
+					type: INK_PLAYER_VIEW_TYPE,
+					active: true,
+				});
+				leaf = rightLeaf;
+			}
+		}
+
+		if (leaf) {
+			this.app.workspace.revealLeaf(leaf);
+			const view = leaf.view as InkPlayerView;
+			view.startStory(story, startPath);
+		}
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<MyPluginSettings>);
+		this.settings = Object.assign(
+			{},
+			DEFAULT_SETTINGS,
+			await this.loadData() as Partial<InkDesignerSettings>
+		);
 	}
 
 	async saveSettings() {
 		await this.saveData(this.settings);
-	}
-}
-
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
-
-	onOpen() {
-		let {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
-
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
 	}
 }

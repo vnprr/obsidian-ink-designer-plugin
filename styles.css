@@ -1,8 +1,129 @@
-/*
+/* === Ink Player === */
+.ink-player-container {
+	padding: 12px;
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+}
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+.ink-player-controls {
+	display: flex;
+	gap: 8px;
+	margin-bottom: 12px;
+	padding-bottom: 8px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
 
-If your plugin does not need CSS, delete this file.
+.ink-player-restart-btn {
+	cursor: pointer;
+}
 
-*/
+.ink-player-story {
+	flex: 1;
+	overflow-y: auto;
+	margin-bottom: 12px;
+}
+
+.ink-player-paragraph p {
+	margin: 0.5em 0;
+	line-height: 1.6;
+}
+
+.ink-player-chosen {
+	color: var(--text-accent);
+	margin: 0.5em 0;
+	padding: 4px 8px;
+	border-left: 3px solid var(--text-accent);
+}
+
+.ink-player-choices {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.ink-player-choice-btn {
+	text-align: left;
+	padding: 8px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background: var(--background-secondary);
+	cursor: pointer;
+	transition: background 0.15s;
+}
+
+.ink-player-choice-btn:hover {
+	background: var(--background-modifier-hover);
+}
+
+.ink-player-end {
+	text-align: center;
+	padding: 16px;
+	color: var(--text-muted);
+}
+
+.ink-player-image {
+	max-width: 100%;
+	border-radius: 4px;
+	margin: 8px 0;
+}
+
+/* === Markdown Decorations === */
+.ink-choice-badge,
+.ink-divert-badge {
+	display: inline-block;
+	font-size: 0.7em;
+	font-weight: 600;
+	text-transform: uppercase;
+	padding: 1px 5px;
+	border-radius: 3px;
+	margin-right: 6px;
+	vertical-align: middle;
+}
+
+.ink-choice-badge {
+	background: var(--color-blue);
+	color: var(--text-on-accent);
+}
+
+.ink-divert-badge {
+	background: var(--color-orange);
+	color: var(--text-on-accent);
+}
+
+.ink-divert-line {
+	border-left: 3px solid var(--color-orange);
+	padding-left: 8px;
+}
+
+code.ink-expression-badge {
+	background: var(--color-purple) !important;
+	color: var(--text-on-accent) !important;
+	border-radius: 3px;
+}
+
+/* Ink callouts */
+.ink-callout.ink-callout-condition {
+	border-left-color: var(--color-yellow);
+}
+
+.ink-callout.ink-callout-sequence {
+	border-left-color: var(--color-cyan);
+}
+
+/* === Variable Suggest === */
+.ink-variable-suggestion {
+	display: flex;
+	align-items: baseline;
+	gap: 6px;
+}
+
+.ink-variable-meta {
+	color: var(--text-muted);
+	font-size: 0.85em;
+}
+
+.ink-variable-source {
+	color: var(--text-faint);
+	font-size: 0.8em;
+}
