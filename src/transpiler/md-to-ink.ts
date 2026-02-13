@@ -1,7 +1,21 @@
-import { TRANSLATION_SCHEMA, ChoiceMode } from "../translation-schema";
+import { TRANSLATION_SCHEMA, ChoiceMode, ARROW_PATTERN } from "../translation-schema";
 import { ParsedNote } from "./parser";
 
 const S = TRANSLATION_SCHEMA;
+
+// Inline (non-^-anchored) regex for divert-at-end-of-line matching.
+// Used in choice text and continuation text where there may be text before the divert.
+const INLINE_DIVERT_LOCAL_RE = new RegExp(
+	`${ARROW_PATTERN}\\s*\\[\\[#([^\\]]+)\\]\\]\\s*$`
+);
+const INLINE_DIVERT_SECTION_RE = new RegExp(
+	`${ARROW_PATTERN}\\s*\\[\\[([^\\]#]+)#([^\\]]+)\\]\\]\\s*$`
+);
+const INLINE_DIVERT_RE = new RegExp(
+	`${ARROW_PATTERN}\\s*\\[\\[([^\\]#]+)\\]\\]\\s*$`
+);
+const INLINE_END_RE = new RegExp(`${ARROW_PATTERN}\\s*END\\s*$`);
+const INLINE_DONE_RE = new RegExp(`${ARROW_PATTERN}\\s*DONE\\s*$`);
 
 export interface TranspileOptions {
 	choiceMode: ChoiceMode;
@@ -118,37 +132,51 @@ function transpileBody(bodyLines: string[], options: TranspileOptions): BodyResu
 			continue;
 		}
 
-		// H1 heading → stitch
-		if (trimmed.startsWith(S.structure.stitch.mdPrefix) && !trimmed.startsWith("## ")) {
-			const headingText = trimmed.slice(S.structure.stitch.mdPrefix.length).trim();
+		// H1 heading → knot title (skip — knot header emitted from filename)
+		if (trimmed.startsWith("# ") && !trimmed.startsWith("## ")) {
+			i++;
+			continue;
+		}
+
+		// H2 heading → stitch
+		if (trimmed.startsWith("## ") && !trimmed.startsWith("### ")) {
+			const headingText = trimmed.slice(3).trim();
 			output.push(S.structure.stitch.toInk(S.slugify(headingText)));
 			i++;
 			continue;
 		}
 
-		// H2+ headings — pass as Ink comments
-		if (/^#{2,}\s/.test(trimmed)) {
+		// H3+ headings → comment
+		if (/^#{3,}\s/.test(trimmed)) {
 			const headingText = trimmed.replace(/^#+\s*/, "");
 			output.push(`// ${headingText}`);
 			i++;
 			continue;
 		}
 
-		// -> END
-		if (trimmed === S.navigation.end.md) {
+		// -> END / → END
+		if (S.navigation.end.mdPattern.test(trimmed)) {
 			output.push(S.navigation.end.ink);
 			i++;
 			continue;
 		}
 
-		// -> DONE
-		if (trimmed === S.navigation.done.md) {
+		// -> DONE / → DONE
+		if (S.navigation.done.mdPattern.test(trimmed)) {
 			output.push(S.navigation.done.ink);
 			i++;
 			continue;
 		}
 
-		// -> [[Target#Section]]
+		// -> [[#Section]] / → [[#Section]] — local stitch divert
+		const localSectionMatch = trimmed.match(S.navigation.divertToLocalSection.mdPattern);
+		if (localSectionMatch) {
+			output.push(S.navigation.divertToLocalSection.toInk(localSectionMatch[1] ?? ""));
+			i++;
+			continue;
+		}
+
+		// -> [[Target#Section]] / → [[Target#Section]]
 		const sectionMatch = trimmed.match(S.navigation.divertToSection.mdPattern);
 		if (sectionMatch) {
 			output.push(S.navigation.divertToSection.toInk(
@@ -158,7 +186,7 @@ function transpileBody(bodyLines: string[], options: TranspileOptions): BodyResu
 			continue;
 		}
 
-		// -> [[Target]]
+		// -> [[Target]] / → [[Target]]
 		const divertMatch = trimmed.match(S.navigation.divert.mdPattern);
 		if (divertMatch) {
 			output.push(S.navigation.divert.toInk(divertMatch[1] ?? ""));
@@ -250,6 +278,56 @@ function isChoiceContinuation(trimmed: string, mode: ChoiceMode): boolean {
 	return /^\s{2,}\S/.test(trimmed);
 }
 
+/**
+ * Try to match a divert pattern at the end of a text line.
+ * Returns the Ink divert string and the text before the divert, or null if no match.
+ */
+function extractInlineDivert(content: string): { textBefore: string; inkDivert: string } | null {
+	const localMatch = content.match(INLINE_DIVERT_LOCAL_RE);
+	if (localMatch) {
+		return {
+			textBefore: content.slice(0, localMatch.index).trim(),
+			inkDivert: S.navigation.divertToLocalSection.toInk(localMatch[1] ?? ""),
+		};
+	}
+
+	const sectionMatch = content.match(INLINE_DIVERT_SECTION_RE);
+	if (sectionMatch) {
+		return {
+			textBefore: content.slice(0, sectionMatch.index).trim(),
+			inkDivert: S.navigation.divertToSection.toInk(
+				sectionMatch[1] ?? "", sectionMatch[2] ?? ""
+			),
+		};
+	}
+
+	const divertMatch = content.match(INLINE_DIVERT_RE);
+	if (divertMatch) {
+		return {
+			textBefore: content.slice(0, divertMatch.index).trim(),
+			inkDivert: S.navigation.divert.toInk(divertMatch[1] ?? ""),
+		};
+	}
+
+	const endMatch = content.match(INLINE_END_RE);
+	if (endMatch) {
+		return {
+			textBefore: content.slice(0, endMatch.index).trim(),
+			inkDivert: S.navigation.end.ink,
+		};
+	}
+
+	const doneMatch = content.match(INLINE_DONE_RE);
+	if (doneMatch) {
+		return {
+			textBefore: content.slice(0, doneMatch.index).trim(),
+			inkDivert: S.navigation.done.ink,
+		};
+	}
+
+	return null;
+}
+
 function transpileChoiceBlock(
 	bodyLines: string[],
 	startIdx: number,
@@ -293,31 +371,13 @@ function transpileChoiceBlock(
 				continue;
 			}
 
-			// Check if continuation is a divert
-			const divertMatch = content.match(/^->\s*\[\[([^\]#]+)\]\]\s*$/);
-			if (divertMatch) {
-				output.push("  " + S.navigation.divert.toInk(divertMatch[1] ?? ""));
-				i++;
-				continue;
-			}
-
-			const sectionDivertMatch = content.match(/^->\s*\[\[([^\]#]+)#([^\]]+)\]\]\s*$/);
-			if (sectionDivertMatch) {
-				output.push("  " + S.navigation.divertToSection.toInk(
-					sectionDivertMatch[1] ?? "", sectionDivertMatch[2] ?? ""
-				));
-				i++;
-				continue;
-			}
-
-			if (content === "-> END") {
-				output.push("  -> END");
-				i++;
-				continue;
-			}
-
-			if (content === "-> DONE") {
-				output.push("  -> DONE");
+			// Try to extract a divert (standalone or at end of text)
+			const inlineDivert = extractInlineDivert(content);
+			if (inlineDivert) {
+				if (inlineDivert.textBefore) {
+					output.push("  " + processInlineElements(inlineDivert.textBefore));
+				}
+				output.push("  " + inlineDivert.inkDivert);
 				i++;
 				continue;
 			}
@@ -343,7 +403,7 @@ function transpileSingleChoice(
 	let text: string;
 	let sticky = false;
 	let condition: string | null = null;
-	let divertTarget: string | null = null;
+	let divertInk: string | null = null;
 
 	if (options.choiceMode === "blockquote") {
 		sticky = trimmed.startsWith("> + ");
@@ -367,17 +427,16 @@ function transpileSingleChoice(
 		text = text.replace(condMatch[0], "").trim();
 	}
 
-	// Check for divert target: [[Target]] or [[Target|Text]]
-	const wikilinkMatch = text.match(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]\s*$/);
-	if (wikilinkMatch) {
-		const linkTarget = wikilinkMatch[1] ?? "";
-		const linkAlias = wikilinkMatch[2];
-		divertTarget = linkTarget;
-		text = text.replace(wikilinkMatch[0], "").trim();
-		if (text === "" && linkAlias) {
-			text = linkAlias;
-		} else if (text === "") {
-			text = linkTarget;
+	// Check for divert — REQUIRES -> or → prefix before [[link]]
+	const inlineDivert = extractInlineDivert(text);
+	if (inlineDivert) {
+		divertInk = inlineDivert.inkDivert;
+		text = inlineDivert.textBefore;
+		if (text === "") {
+			// Use the divert target name as display text
+			// Extract a readable name from the Ink divert: "-> foo_bar" → "foo_bar"
+			const targetName = divertInk.replace(/^->\s*/, "").replace(/\./g, " ");
+			text = targetName;
 		}
 	}
 
@@ -391,8 +450,8 @@ function transpileSingleChoice(
 
 	ink += `[${text}]`;
 
-	if (divertTarget) {
-		ink += ` -> ${S.slugify(divertTarget)}`;
+	if (divertInk) {
+		ink += ` ${divertInk}`;
 	}
 
 	return ink;

@@ -1,6 +1,11 @@
 import type { MarkdownPostProcessorContext } from "obsidian";
 import type InkDesignerPlugin from "../main";
 import { t } from "../i18n/index";
+import { ARROW_PATTERN } from "../translation-schema";
+
+const DIVERT_LINE_RE = new RegExp(`^${ARROW_PATTERN}\\s*\\[\\[.*\\]\\]`);
+const END_LINE_RE = new RegExp(`^${ARROW_PATTERN}\\s*END$`);
+const DONE_LINE_RE = new RegExp(`^${ARROW_PATTERN}\\s*DONE$`);
 
 /**
  * Register the MarkdownPostProcessor for Ink-specific decorations.
@@ -53,9 +58,9 @@ function decorateDiverts(element: HTMLElement): void {
 		const text = p.textContent ?? "";
 		const trimmed = text.trim();
 
-		if (/^->\s*\[\[.*\]\]/.test(trimmed) ||
-			trimmed === "-> END" ||
-			trimmed === "-> DONE") {
+		if (DIVERT_LINE_RE.test(trimmed) ||
+			END_LINE_RE.test(trimmed) ||
+			DONE_LINE_RE.test(trimmed)) {
 			p.addClass("ink-divert-line");
 
 			const badge = createSpan({

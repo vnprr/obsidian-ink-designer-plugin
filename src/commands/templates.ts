@@ -82,12 +82,14 @@ function buildKnotTemplate(project: string): string {
 ink-type: knot
 ${projectLine}---
 
-# Scene
+# New Node
+
+## Scene
 
 Your narrative text here.
 
-> - First choice
-> - Second choice
+> - First choice -> [[Target]]
+> - Second choice -> [[Other]]
 `;
 }
 

@@ -2,6 +2,9 @@ import { slugify } from "./core/slug";
 
 export type ChoiceMode = "blockquote" | "asterisk";
 
+/** Matches both ASCII arrow `->` and Unicode arrow `→` */
+export const ARROW_PATTERN = "(?:->|\u2192)";
+
 export const TRANSLATION_SCHEMA = {
 
 	slugify,
@@ -12,7 +15,7 @@ export const TRANSLATION_SCHEMA = {
 			toInk: (id: string) => `=== ${id}`,
 		},
 		stitch: {
-			mdPrefix: "# ",
+			mdPrefix: "## ",
 			toInk: (id: string) => `= ${id}`,
 		},
 		text: {
@@ -62,16 +65,26 @@ export const TRANSLATION_SCHEMA = {
 	// === NAVIGATION ===
 	navigation: {
 		divert: {
-			mdPattern: /^->\s*\[\[([^\]#]+)\]\]\s*$/,
+			mdPattern: new RegExp(`^${ARROW_PATTERN}\\s*\\[\\[([^\\]#]+)\\]\\]\\s*$`),
 			toInk: (target: string) => `-> ${slugify(target)}`,
 		},
 		divertToSection: {
-			mdPattern: /^->\s*\[\[([^\]#]+)#([^\]]+)\]\]\s*$/,
+			mdPattern: new RegExp(`^${ARROW_PATTERN}\\s*\\[\\[([^\\]#]+)#([^\\]]+)\\]\\]\\s*$`),
 			toInk: (target: string, section: string) =>
 				`-> ${slugify(target)}.${slugify(section)}`,
 		},
-		end: { md: "-> END", ink: "-> END" },
-		done: { md: "-> DONE", ink: "-> DONE" },
+		divertToLocalSection: {
+			mdPattern: new RegExp(`^${ARROW_PATTERN}\\s*\\[\\[#([^\\]]+)\\]\\]\\s*$`),
+			toInk: (section: string) => `-> ${slugify(section)}`,
+		},
+		end: {
+			mdPattern: new RegExp(`^${ARROW_PATTERN}\\s*END$`),
+			ink: "-> END",
+		},
+		done: {
+			mdPattern: new RegExp(`^${ARROW_PATTERN}\\s*DONE$`),
+			ink: "-> DONE",
+		},
 	},
 
 	// === GATHERS ===
@@ -169,6 +182,6 @@ export const TRANSLATION_SCHEMA = {
 				`LIST ${name} = ${values.join(", ")}`,
 		},
 	},
-} as const;
+};
 
 export type TranslationSchemaType = typeof TRANSLATION_SCHEMA;
