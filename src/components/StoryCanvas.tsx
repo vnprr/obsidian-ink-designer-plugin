@@ -6,6 +6,7 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
   addEdge,
+  MarkerType,
   type Node,
   type Edge,
   type OnNodesChange,
@@ -14,6 +15,18 @@ import {
 } from "@xyflow/react";
 
 import { StoryDocument, type StoryFile } from "../core/StoryDocument";
+import { DialogueNode } from "./nodes/DialogueNode";
+import { ChoiceEdge } from "./edges/ChoiceEdge";
+import { Toolbar } from "./Toolbar";
+
+// MUST be defined at module level — recreating per render breaks xyflow memoization
+const nodeTypes = { dialogue: DialogueNode };
+const edgeTypes = { choice: ChoiceEdge };
+
+const defaultEdgeOptions = {
+  type: "choice",
+  markerEnd: { type: MarkerType.ArrowClosed },
+};
 
 interface StoryCanvasProps {
   initialNodes?: Node[];
@@ -56,6 +69,56 @@ export function StoryCanvas({ initialNodes, initialEdges, meta, onSave }: StoryC
     };
   }, []);
 
+  // Node data change callbacks — passed through node data
+  const onTextChange = useCallback((nodeId: string, newText: string) => {
+    setNodes((nds) =>
+      nds.map((n) =>
+        n.id === nodeId ? { ...n, data: { ...n.data, text: newText } } : n,
+      ),
+    );
+    triggerSave();
+  }, [triggerSave]);
+
+  const onLabelChange = useCallback((nodeId: string, newLabel: string) => {
+    setNodes((nds) =>
+      nds.map((n) =>
+        n.id === nodeId ? { ...n, data: { ...n.data, label: newLabel } } : n,
+      ),
+    );
+    triggerSave();
+  }, [triggerSave]);
+
+  // Edge data change callback
+  const onChoiceTextChange = useCallback((edgeId: string, newText: string) => {
+    setEdges((eds) =>
+      eds.map((e) =>
+        e.id === edgeId
+          ? { ...e, data: { ...e.data, choiceText: newText, isNew: false } }
+          : e,
+      ),
+    );
+    triggerSave();
+  }, [triggerSave]);
+
+  // Inject callbacks into node data so custom nodes can call them
+  const nodesWithCallbacks = nodes.map((n) => ({
+    ...n,
+    data: {
+      ...n.data,
+      onTextChange,
+      onLabelChange,
+    },
+  }));
+
+  // Inject callbacks into edge data so custom edges can call them
+  const edgesWithCallbacks = edges.map((e) => ({
+    ...e,
+    data: {
+      ...e.data,
+      onChoiceTextChange,
+    },
+  }));
+
   const onNodesChange: OnNodesChange = useCallback(
     (changes) => {
       setNodes((nds) => {
@@ -81,10 +144,36 @@ export function StoryCanvas({ initialNodes, initialEdges, meta, onSave }: StoryC
   const onConnect: OnConnect = useCallback(
     (params) => {
       setEdges((eds) => {
-        const updated = addEdge(params, eds);
+        const newEdge: Edge = {
+          ...params,
+          id: `edge-${Date.now()}`,
+          type: "choice",
+          markerEnd: { type: MarkerType.ArrowClosed },
+          data: { choiceText: "", isNew: true },
+        };
+        const updated = addEdge(newEdge, eds);
         triggerSave();
         return updated;
       });
+    },
+    [triggerSave],
+  );
+
+  const addNodeAtPosition = useCallback(
+    (x: number, y: number) => {
+      const newId = `node-${Date.now()}`;
+      const newNode: Node = {
+        id: newId,
+        type: "dialogue",
+        position: { x, y },
+        data: {
+          label: "New Node",
+          text: "Enter text...",
+          isStart: false,
+        },
+      };
+      setNodes((nds) => [...nds, newNode]);
+      triggerSave();
     },
     [triggerSave],
   );
@@ -100,15 +189,20 @@ export function StoryCanvas({ initialNodes, initialEdges, meta, onSave }: StoryC
   return (
     <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}>
       <ReactFlow
-        nodes={nodes}
-        edges={edges}
+        nodes={nodesWithCallbacks}
+        edges={edgesWithCallbacks}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        defaultEdgeOptions={defaultEdgeOptions}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         fitView
+        deleteKeyCode="Backspace"
       >
         <Controls />
         <Background />
+        <Toolbar onAddNode={addNodeAtPosition} />
       </ReactFlow>
     </div>
   );

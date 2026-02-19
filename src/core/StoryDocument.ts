@@ -51,11 +51,16 @@ export class StoryDocument {
   get globals(): StoryFile["globals"] { return this.file.globals; }
 
   toReactFlowNodes(): Node[] {
+    const startId = this.file.settings.startNodeId;
     return this.file.nodes.map((node) => ({
       id: node.id,
-      type: node.type === "dialogue" ? "default" : node.type,
+      type: "dialogue",
       position: node.position,
-      data: { label: node.data.label || node.data.text },
+      data: {
+        label: node.data.label || "Untitled",
+        text: node.data.text || "",
+        isStart: node.id === startId,
+      },
     }));
   }
 
@@ -64,7 +69,8 @@ export class StoryDocument {
       id: edge.id,
       source: edge.source,
       target: edge.target,
-      label: edge.data.choiceText || undefined,
+      type: "choice",
+      data: { choiceText: edge.data.choiceText || "" },
     }));
   }
 
@@ -78,8 +84,8 @@ export class StoryDocument {
       type: "dialogue",
       position: n.position,
       data: {
-        label: typeof n.data.label === "string" ? n.data.label : "",
-        text: typeof n.data.label === "string" ? n.data.label : "",
+        label: typeof n.data.label === "string" ? n.data.label : "Untitled",
+        text: typeof n.data.text === "string" ? n.data.text : "",
       },
     }));
 
@@ -88,7 +94,7 @@ export class StoryDocument {
       source: e.source,
       target: e.target,
       data: {
-        choiceText: typeof e.label === "string" ? e.label : undefined,
+        choiceText: typeof e.data?.choiceText === "string" ? e.data.choiceText : "",
       },
     }));
 

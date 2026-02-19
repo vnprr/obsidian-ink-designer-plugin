@@ -630,3 +630,112 @@ svg.react-flow__connectionline {
   overflow: hidden !important;
   position: relative !important;
 }
+
+/* DialogueNode */
+.dialogue-node {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 0;
+  min-width: 160px;
+  max-width: 280px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.dialogue-node.is-start {
+  border-left: 3px solid #4caf50;
+}
+
+.dialogue-node .node-label {
+  font-weight: bold;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 6px 10px 2px;
+  cursor: default;
+  user-select: none;
+}
+
+.dialogue-node .node-label[contenteditable="true"] {
+  outline: 1px solid var(--interactive-accent);
+  border-radius: 2px;
+  cursor: text;
+  user-select: text;
+}
+
+.dialogue-node .node-text {
+  font-size: 13px;
+  color: var(--text-normal);
+  padding: 2px 10px 8px;
+  min-height: 30px;
+  cursor: default;
+  user-select: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.dialogue-node .node-text[contenteditable="true"] {
+  outline: 1px solid var(--interactive-accent);
+  border-radius: 2px;
+  cursor: text;
+  user-select: text;
+}
+
+/* ChoiceEdge label */
+.choice-edge-label {
+  font-size: 12px;
+  background: var(--background-primary);
+  border-radius: 4px;
+  padding: 2px 4px;
+}
+
+.choice-edge-label .choice-edge-text {
+  cursor: pointer;
+  color: var(--text-normal);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.choice-edge-label .choice-edge-text:hover {
+  background: var(--background-modifier-hover);
+}
+
+.choice-edge-label .choice-edge-input {
+  font-size: 12px;
+  padding: 2px 6px;
+  border: 1px solid var(--interactive-accent);
+  border-radius: 3px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  outline: none;
+  min-width: 80px;
+}
+
+/* Toolbar */
+.ink-toolbar {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  background: var(--background-secondary);
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.ink-toolbar button {
+  font-size: 12px;
+  padding: 4px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  cursor: pointer;
+}
+
+.ink-toolbar button:hover:not(:disabled) {
+  background: var(--background-modifier-hover);
+}
+
+.ink-toolbar button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
