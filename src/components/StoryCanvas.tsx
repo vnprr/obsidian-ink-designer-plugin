@@ -6,13 +6,17 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
   addEdge,
+  reconnectEdge,
   MarkerType,
+  Position,
   type Node,
   type Edge,
   type OnNodesChange,
   type OnEdgesChange,
   type OnConnect,
+  type ReactFlowInstance,
 } from "@xyflow/react";
+import type { FinalConnectionState } from "@xyflow/system";
 
 import { StoryDocument, type StoryFile } from "../core/StoryDocument";
 import { DialogueNode } from "./nodes/DialogueNode";
@@ -27,6 +31,17 @@ const defaultEdgeOptions = {
   type: "choice",
   markerEnd: { type: MarkerType.ArrowClosed },
 };
+
+// Given source handle position, pick a sensible default target handle on the opposite side
+function getDefaultTargetHandle(sourcePosition: Position | null | undefined): string {
+  switch (sourcePosition) {
+    case Position.Bottom: return "top-target";
+    case Position.Top: return "bottom-target";
+    case Position.Right: return "left-target";
+    case Position.Left: return "right-target";
+    default: return "top-target";
+  }
+}
 
 interface StoryCanvasProps {
   initialNodes?: Node[];
@@ -49,6 +64,8 @@ export function StoryCanvas({ initialNodes, initialEdges, meta, onSave }: StoryC
   const metaRef = useRef(meta);
   metaRef.current = meta;
 
+  const reactFlowRef = useRef<ReactFlowInstance | null>(null);
+
   const triggerSave = useCallback(() => {
     if (!onSave) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -69,20 +86,11 @@ export function StoryCanvas({ initialNodes, initialEdges, meta, onSave }: StoryC
     };
   }, []);
 
-  // Node data change callbacks — passed through node data
+  // Node data change callback
   const onTextChange = useCallback((nodeId: string, newText: string) => {
     setNodes((nds) =>
       nds.map((n) =>
         n.id === nodeId ? { ...n, data: { ...n.data, text: newText } } : n,
-      ),
-    );
-    triggerSave();
-  }, [triggerSave]);
-
-  const onLabelChange = useCallback((nodeId: string, newLabel: string) => {
-    setNodes((nds) =>
-      nds.map((n) =>
-        n.id === nodeId ? { ...n, data: { ...n.data, label: newLabel } } : n,
       ),
     );
     triggerSave();
@@ -106,7 +114,6 @@ export function StoryCanvas({ initialNodes, initialEdges, meta, onSave }: StoryC
     data: {
       ...n.data,
       onTextChange,
-      onLabelChange,
     },
   }));
 
@@ -159,6 +166,71 @@ export function StoryCanvas({ initialNodes, initialEdges, meta, onSave }: StoryC
     [triggerSave],
   );
 
+  // Edge reconnection: drag endpoint to a different node
+  const onReconnect = useCallback(
+    (oldEdge: Edge, newConnection: { source: string; target: string; sourceHandle: string | null; targetHandle: string | null }) => {
+      setEdges((eds) => reconnectEdge(oldEdge, newConnection, eds));
+      triggerSave();
+    },
+    [triggerSave],
+  );
+
+  // Edge reconnection end: if dropped in empty space, remove the edge
+  const onReconnectEnd = useCallback(
+    (_event: MouseEvent | TouchEvent, edge: Edge, _handleType: unknown, connectionState: FinalConnectionState) => {
+      if (!connectionState.isValid) {
+        setEdges((eds) => eds.filter((e) => e.id !== edge.id));
+        triggerSave();
+      }
+    },
+    [triggerSave],
+  );
+
+  // Connection end: if dropped in empty space, create a new node + edge
+  const onConnectEnd = useCallback(
+    (event: MouseEvent | TouchEvent, connectionState: FinalConnectionState) => {
+      if (connectionState.isValid || !connectionState.fromNode || !connectionState.fromHandle) {
+        return;
+      }
+
+      const instance = reactFlowRef.current;
+      if (!instance) return;
+
+      const clientX = "changedTouches" in event
+        ? event.changedTouches[0].clientX
+        : event.clientX;
+      const clientY = "changedTouches" in event
+        ? event.changedTouches[0].clientY
+        : event.clientY;
+
+      const position = instance.screenToFlowPosition({ x: clientX, y: clientY });
+
+      const newNodeId = `node-${Date.now()}`;
+      const newNode: Node = {
+        id: newNodeId,
+        type: "dialogue",
+        position,
+        data: { text: "", isStart: false },
+      };
+
+      const newEdge: Edge = {
+        id: `edge-${Date.now()}`,
+        source: connectionState.fromNode.id,
+        sourceHandle: connectionState.fromHandle.id,
+        target: newNodeId,
+        targetHandle: getDefaultTargetHandle(connectionState.fromHandle.position),
+        type: "choice",
+        markerEnd: { type: MarkerType.ArrowClosed },
+        data: { choiceText: "", isNew: true },
+      };
+
+      setNodes((nds) => [...nds, newNode]);
+      setEdges((eds) => [...eds, newEdge]);
+      triggerSave();
+    },
+    [triggerSave],
+  );
+
   const addNodeAtPosition = useCallback(
     (x: number, y: number) => {
       const newId = `node-${Date.now()}`;
@@ -167,8 +239,7 @@ export function StoryCanvas({ initialNodes, initialEdges, meta, onSave }: StoryC
         type: "dialogue",
         position: { x, y },
         data: {
-          label: "New Node",
-          text: "Enter text...",
+          text: "",
           isStart: false,
         },
       };
@@ -177,6 +248,10 @@ export function StoryCanvas({ initialNodes, initialEdges, meta, onSave }: StoryC
     },
     [triggerSave],
   );
+
+  const onInit = useCallback((instance: ReactFlowInstance) => {
+    reactFlowRef.current = instance;
+  }, []);
 
   if (!initialNodes) {
     return (
@@ -197,6 +272,11 @@ export function StoryCanvas({ initialNodes, initialEdges, meta, onSave }: StoryC
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onConnectEnd={onConnectEnd}
+        onReconnect={onReconnect}
+        onReconnectEnd={onReconnectEnd}
+        onInit={onInit}
+        edgesReconnectable
         fitView
         deleteKeyCode="Backspace"
       >

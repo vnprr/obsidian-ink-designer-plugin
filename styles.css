@@ -646,38 +646,53 @@ svg.react-flow__connectionline {
   border-left: 3px solid #4caf50;
 }
 
-.dialogue-node .node-label {
-  font-weight: bold;
-  font-size: 11px;
-  color: var(--text-muted);
-  padding: 6px 10px 2px;
-  cursor: default;
-  user-select: none;
-}
-
-.dialogue-node .node-label[contenteditable="true"] {
-  outline: 1px solid var(--interactive-accent);
-  border-radius: 2px;
-  cursor: text;
-  user-select: text;
-}
-
 .dialogue-node .node-text {
   font-size: 13px;
   color: var(--text-normal);
-  padding: 2px 10px 8px;
-  min-height: 30px;
+  padding: 8px 10px;
+  min-height: 40px;
   cursor: default;
   user-select: none;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
-.dialogue-node .node-text[contenteditable="true"] {
+.dialogue-node .node-text.is-empty::after {
+  content: "Enter text...";
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.dialogue-node .node-text-edit {
+  display: block;
+  width: 100%;
+  min-height: 40px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text-normal);
+  background: var(--background-primary);
+  border: none;
   outline: 1px solid var(--interactive-accent);
-  border-radius: 2px;
-  cursor: text;
-  user-select: text;
+  border-radius: 4px;
+  padding: 8px 10px;
+  resize: none;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-break: break-word;
+  box-sizing: border-box;
+  field-sizing: content;
+}
+
+/* Handle styling */
+.dialogue-node .react-flow__handle {
+  width: 8px;
+  height: 8px;
+  background: var(--interactive-accent);
+  border: 1px solid var(--background-primary);
+}
+
+.dialogue-node .react-flow__handle-source {
+  z-index: 1;
 }
 
 /* ChoiceEdge label */

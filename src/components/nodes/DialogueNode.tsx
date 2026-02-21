@@ -1,84 +1,91 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 
 interface DialogueNodeData {
-  label: string;
   text: string;
   isStart: boolean;
   onTextChange?: (id: string, text: string) => void;
-  onLabelChange?: (id: string, label: string) => void;
 }
 
 export function DialogueNode({ id, data }: NodeProps & { data: DialogueNodeData }) {
-  const [editingText, setEditingText] = useState(false);
-  const [editingLabel, setEditingLabel] = useState(false);
-  const textRef = useRef<HTMLDivElement>(null);
-  const labelRef = useRef<HTMLDivElement>(null);
+  const [editing, setEditing] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const handleTextDoubleClick = useCallback(() => {
-    setEditingText(true);
-    setTimeout(() => textRef.current?.focus(), 0);
+  useEffect(() => {
+    if (editing && textareaRef.current) {
+      const ta = textareaRef.current;
+      ta.focus();
+      ta.selectionStart = ta.selectionEnd = ta.value.length;
+      // JS fallback for auto-resize
+      ta.style.height = "auto";
+      ta.style.height = ta.scrollHeight + "px";
+    }
+  }, [editing]);
+
+  const handleDoubleClick = useCallback(() => {
+    setEditing(true);
   }, []);
 
-  const handleTextBlur = useCallback(() => {
-    setEditingText(false);
-    const newText = textRef.current?.textContent || "";
+  const commitText = useCallback(() => {
+    setEditing(false);
+    const newText = textareaRef.current?.value ?? "";
     data.onTextChange?.(id, newText);
   }, [id, data]);
 
-  const handleTextKeyDown = useCallback((e: React.KeyboardEvent) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
-      setEditingText(false);
-      const newText = textRef.current?.textContent || "";
-      data.onTextChange?.(id, newText);
+      commitText();
     }
-  }, [id, data]);
+    // Stop propagation so xyflow doesn't intercept Backspace/Delete/etc
+    e.stopPropagation();
+  }, [commitText]);
 
-  const handleLabelDoubleClick = useCallback(() => {
-    setEditingLabel(true);
-    setTimeout(() => labelRef.current?.focus(), 0);
+  const handleInput = useCallback((e: React.FormEvent<HTMLTextAreaElement>) => {
+    // JS fallback for auto-resize
+    const ta = e.currentTarget;
+    ta.style.height = "auto";
+    ta.style.height = ta.scrollHeight + "px";
   }, []);
 
-  const handleLabelBlur = useCallback(() => {
-    setEditingLabel(false);
-    const newLabel = labelRef.current?.textContent || "";
-    data.onLabelChange?.(id, newLabel);
-  }, [id, data]);
-
-  const handleLabelKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === "Escape") {
-      setEditingLabel(false);
-      const newLabel = labelRef.current?.textContent || "";
-      data.onLabelChange?.(id, newLabel);
-    }
-  }, [id, data]);
+  const hasText = (data.text ?? "").length > 0;
 
   return (
     <div className={`dialogue-node${data.isStart ? " is-start" : ""}`}>
-      <Handle type="target" position={Position.Top} />
-      <div
-        ref={labelRef}
-        className="node-label"
-        contentEditable={editingLabel}
-        suppressContentEditableWarning
-        onDoubleClick={handleLabelDoubleClick}
-        onBlur={handleLabelBlur}
-        onKeyDown={handleLabelKeyDown}
-      >
-        {data.label}
-      </div>
-      <div
-        ref={textRef}
-        className="node-text"
-        contentEditable={editingText}
-        suppressContentEditableWarning
-        onDoubleClick={handleTextDoubleClick}
-        onBlur={handleTextBlur}
-        onKeyDown={handleTextKeyDown}
-      >
-        {data.text}
-      </div>
-      <Handle type="source" position={Position.Bottom} />
+      {/* Top handles */}
+      <Handle type="target" position={Position.Top} id="top-target" />
+      <Handle type="source" position={Position.Top} id="top-source" />
+
+      {/* Left handles */}
+      <Handle type="target" position={Position.Left} id="left-target" />
+      <Handle type="source" position={Position.Left} id="left-source" />
+
+      {/* Text content */}
+      {editing ? (
+        <textarea
+          ref={textareaRef}
+          className="node-text-edit"
+          defaultValue={data.text}
+          placeholder="Enter text..."
+          onBlur={commitText}
+          onKeyDown={handleKeyDown}
+          onInput={handleInput}
+        />
+      ) : (
+        <div
+          className={`node-text${!hasText ? " is-empty" : ""}`}
+          onDoubleClick={handleDoubleClick}
+        >
+          {hasText ? data.text : null}
+        </div>
+      )}
+
+      {/* Right handles */}
+      <Handle type="target" position={Position.Right} id="right-target" />
+      <Handle type="source" position={Position.Right} id="right-source" />
+
+      {/* Bottom handles */}
+      <Handle type="target" position={Position.Bottom} id="bottom-target" />
+      <Handle type="source" position={Position.Bottom} id="bottom-source" />
     </div>
   );
 }

@@ -11,6 +11,8 @@ export interface StoryEdge {
   id: string;
   source: string;
   target: string;
+  sourceHandle?: string;
+  targetHandle?: string;
   type?: string;
   data: { choiceText?: string };
 }
@@ -57,7 +59,6 @@ export class StoryDocument {
       type: "dialogue",
       position: node.position,
       data: {
-        label: node.data.label || "Untitled",
         text: node.data.text || "",
         isStart: node.id === startId,
       },
@@ -69,6 +70,8 @@ export class StoryDocument {
       id: edge.id,
       source: edge.source,
       target: edge.target,
+      sourceHandle: edge.sourceHandle,
+      targetHandle: edge.targetHandle,
       type: "choice",
       data: { choiceText: edge.data.choiceText || "" },
     }));
@@ -79,20 +82,23 @@ export class StoryDocument {
     edges: Edge[],
     meta: { name: string; startNodeId: string; globals?: StoryFile["globals"] },
   ): StoryDocument {
-    const storyNodes: StoryNode[] = nodes.map((n) => ({
-      id: n.id,
-      type: "dialogue",
-      position: n.position,
-      data: {
-        label: typeof n.data.label === "string" ? n.data.label : "Untitled",
-        text: typeof n.data.text === "string" ? n.data.text : "",
-      },
-    }));
+    const storyNodes: StoryNode[] = nodes.map((n) => {
+      const text = typeof n.data.text === "string" ? n.data.text : "";
+      const autoLabel = text.split(/\s+/).slice(0, 4).join(" ") || n.id;
+      return {
+        id: n.id,
+        type: "dialogue",
+        position: n.position,
+        data: { label: autoLabel, text },
+      };
+    });
 
     const storyEdges: StoryEdge[] = edges.map((e) => ({
       id: e.id,
       source: e.source,
       target: e.target,
+      sourceHandle: e.sourceHandle ?? undefined,
+      targetHandle: e.targetHandle ?? undefined,
       data: {
         choiceText: typeof e.data?.choiceText === "string" ? e.data.choiceText : "",
       },
@@ -118,7 +124,7 @@ export class StoryDocument {
           id: "node-1",
           type: "dialogue",
           position: { x: 0, y: 0 },
-          data: { label: "Start", text: "Your story begins here..." },
+          data: { label: "Start", text: "" },
         },
       ],
       edges: [],
