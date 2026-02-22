@@ -7,7 +7,7 @@ interface DialogueNodeData {
   onTextChange?: (id: string, text: string) => void;
 }
 
-export function DialogueNode({ id, data }: NodeProps & { data: DialogueNodeData }) {
+export function DialogueNode({ id, data, selected }: NodeProps & { data: DialogueNodeData }) {
   const [editing, setEditing] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -25,6 +25,12 @@ export function DialogueNode({ id, data }: NodeProps & { data: DialogueNodeData 
   const handleDoubleClick = useCallback(() => {
     setEditing(true);
   }, []);
+
+  const handleClick = useCallback(() => {
+    if (selected) {
+      setEditing(true);
+    }
+  }, [selected]);
 
   const commitText = useCallback(() => {
     setEditing(false);
@@ -65,18 +71,18 @@ export function DialogueNode({ id, data }: NodeProps & { data: DialogueNodeData 
           ref={textareaRef}
           className="node-text-edit"
           defaultValue={data.text}
-          placeholder="Enter text..."
           onBlur={commitText}
           onKeyDown={handleKeyDown}
           onInput={handleInput}
         />
       ) : (
-        <div
-          className={`node-text${!hasText ? " is-empty" : ""}`}
-          onDoubleClick={handleDoubleClick}
-        >
-          {hasText ? data.text : null}
-        </div>
+      <div
+        className="node-text"
+        onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
+      >
+        {data.text}
+      </div>
       )}
 
       {/* Right handles */}

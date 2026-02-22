@@ -65,6 +65,7 @@ export function StoryCanvas({ initialNodes, initialEdges, meta, onSave }: StoryC
   metaRef.current = meta;
 
   const reactFlowRef = useRef<ReactFlowInstance | null>(null);
+  const isReconnectingRef = useRef(false);
 
   const triggerSave = useCallback(() => {
     if (!onSave) return;
@@ -175,9 +176,15 @@ export function StoryCanvas({ initialNodes, initialEdges, meta, onSave }: StoryC
     [triggerSave],
   );
 
+  const onReconnectStart = useCallback(() => {
+    isReconnectingRef.current = true;
+  }, []);
+
+
   // Edge reconnection end: if dropped in empty space, remove the edge
   const onReconnectEnd = useCallback(
     (_event: MouseEvent | TouchEvent, edge: Edge, _handleType: unknown, connectionState: FinalConnectionState) => {
+      isReconnectingRef.current = false;
       if (!connectionState.isValid) {
         setEdges((eds) => eds.filter((e) => e.id !== edge.id));
         triggerSave();
@@ -192,6 +199,8 @@ export function StoryCanvas({ initialNodes, initialEdges, meta, onSave }: StoryC
       if (connectionState.isValid || !connectionState.fromNode || !connectionState.fromHandle) {
         return;
       }
+
+      if (isReconnectingRef.current) return;
 
       const instance = reactFlowRef.current;
       if (!instance) return;
@@ -253,6 +262,18 @@ export function StoryCanvas({ initialNodes, initialEdges, meta, onSave }: StoryC
     reactFlowRef.current = instance;
   }, []);
 
+  const onPaneDoubleClick = useCallback(
+    (event: React.MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.classList.contains("react-flow__pane")) return;
+      const instance = reactFlowRef.current;
+      if (!instance) return;
+      const position = instance.screenToFlowPosition({ x: event.clientX, y: event.clientY });
+      addNodeAtPosition(position.x, position.y);
+    },
+    [addNodeAtPosition],
+  );
+
   if (!initialNodes) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text-muted)" }}>
@@ -262,7 +283,10 @@ export function StoryCanvas({ initialNodes, initialEdges, meta, onSave }: StoryC
   }
 
   return (
-    <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}>
+    <div
+      style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+      onDoubleClick={onPaneDoubleClick}
+    >
       <ReactFlow
         nodes={nodesWithCallbacks}
         edges={edgesWithCallbacks}
@@ -274,11 +298,13 @@ export function StoryCanvas({ initialNodes, initialEdges, meta, onSave }: StoryC
         onConnect={onConnect}
         onConnectEnd={onConnectEnd}
         onReconnect={onReconnect}
+        onReconnectStart={onReconnectStart}
         onReconnectEnd={onReconnectEnd}
         onInit={onInit}
         edgesReconnectable
         fitView
         deleteKeyCode="Backspace"
+        zoomOnDoubleClick={false}
       >
         <Controls />
         <Background />

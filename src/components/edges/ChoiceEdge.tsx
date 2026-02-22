@@ -22,6 +22,7 @@ export function ChoiceEdge({
   targetPosition,
   data,
   markerEnd,
+  selected,
 }: EdgeProps & { data: ChoiceEdgeData }) {
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
@@ -58,9 +59,15 @@ export function ChoiceEdge({
   );
 
   const handleLabelClick = useCallback(() => {
-    setEditing(true);
-    setTimeout(() => inputRef.current?.focus(), 0);
-  }, []);
+    if (selected)
+      setEditing(true);
+      setTimeout(() => inputRef.current?.focus(), 0);
+    }, [selected]);
+
+    const handleLabelDoubleClick = useCallback(() => {
+      setEditing(true);
+      setTimeout(() => inputRef.current?.focus(), 0);
+    }, []);
 
   const hasText = text.trim().length > 0;
 
@@ -73,7 +80,7 @@ export function ChoiceEdge({
       />
       <EdgeLabelRenderer>
         <div
-          className="choice-edge-label"
+          className={`choice-edge-label${selected ? " selected" : ""}`}
           style={{
             position: "absolute",
             transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
@@ -88,7 +95,6 @@ export function ChoiceEdge({
               onChange={(e) => setText(e.target.value)}
               onBlur={commitText}
               onKeyDown={handleKeyDown}
-              placeholder="choice text..."
             />
           ) : (
             <span

@@ -1,17 +1,19 @@
 import esbuild from "esbuild";
 import process from "process";
 import builtins from "builtin-modules";
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from "fs";
 
 const prod = process.argv[2] === "production";
 
-// Merge xyflow CSS + custom CSS into styles.css (loaded by Obsidian)
+// Merge xyflow CSS + custom CSS into dist/styles.css (loaded by Obsidian)
 function mergeCSS() {
+  mkdirSync("dist", { recursive: true });
   let css = readFileSync("node_modules/@xyflow/react/dist/style.css", "utf8");
   if (existsSync("src/styles.css")) {
     css += "\n\n" + readFileSync("src/styles.css", "utf8");
   }
-  writeFileSync("styles.css", css);
+  writeFileSync("dist/styles.css", css);
+  copyFileSync("manifest.json", "dist/manifest.json");
 }
 
 const context = await esbuild.context({
@@ -38,7 +40,7 @@ const context = await esbuild.context({
   logLevel: "info",
   sourcemap: prod ? false : "inline",
   treeShaking: true,
-  outfile: "main.js",
+  outfile: "dist/main.js",
 });
 
 mergeCSS();

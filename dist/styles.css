@@ -624,6 +624,12 @@ svg.react-flow__connectionline {
 }
 
 
+/* ─────────────────────────────────────────────────────
+   CANVAS WRAPPER
+   Obsidian domyślnie dodaje padding i overflow do .view-content.
+   Te overrides sprawiają że React Flow zajmuje całą dostępną przestrzeń
+   bez scrollbarów i zbędnych marginesów.
+───────────────────────────────────────────────────── */
 .view-content:has(.react-flow) {
   height: 100% !important;
   padding: 0 !important;
@@ -631,7 +637,13 @@ svg.react-flow__connectionline {
   position: relative !important;
 }
 
-/* DialogueNode */
+/* ─────────────────────────────────────────────────────
+   DIALOGUE NODE — kontener
+   Główna karta noda dialogowego. Widoczna zawsze.
+   - domyślnie: szara ramka, cień, zaokrąglone rogi
+   - .is-start: zielona lewa krawędź (oznacza węzeł startowy)
+   - .selected (dodawane przez React Flow): fioletowa ramka akcentu
+───────────────────────────────────────────────────── */
 .dialogue-node {
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
@@ -642,14 +654,21 @@ svg.react-flow__connectionline {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
 }
 
+/* Węzeł startowy — zielona lewa krawędź */
 .dialogue-node.is-start {
-  border-left: 3px solid #4caf50;
+  border-left: 3px solid #4caf50; 
 }
 
+/* React Flow dodaje .selected do wrappera noda gdy jest zaznaczony */
 .react-flow__node.selected .dialogue-node {
   border-color: var(--interactive-accent);
 }
 
+/* ─────────────────────────────────────────────────────
+   DIALOGUE NODE — tekst (tryb czytania)
+   Wyświetlany gdy editing=false. Nieaktywny kursor,
+   brak zaznaczania tekstu — klik obsługuje React Flow.
+───────────────────────────────────────────────────── */
 .dialogue-node .node-text {
   font-size: 13px;
   color: var(--text-normal);
@@ -661,6 +680,15 @@ svg.react-flow__connectionline {
   word-break: break-word;
 }
 
+/* ─────────────────────────────────────────────────────
+   DIALOGUE NODE — textarea (tryb edycji)
+   Pojawia się gdy editing=true (po podwójnym kliknięciu
+   lub kliknięciu w zaznaczony node).
+   - outline zamiast border żeby nie zmieniać rozmiaru boxa
+   - field-sizing: content — auto-resize w pionie
+   - brak outline gdy node jest zaznaczony (patrz niżej) —
+     unika podwójnych fioletowych obramowań
+───────────────────────────────────────────────────── */
 .dialogue-node .node-text-edit {
   display: block;
   width: 100%;
@@ -669,9 +697,9 @@ svg.react-flow__connectionline {
   font-family: inherit;
   color: var(--text-normal);
   background: var(--background-primary);
-  border: none;
-  outline: 1px solid var(--interactive-accent);
-  border-radius: 4px;
+  /* border: 2px solid var(--background-modifier-border) !important; */
+  outline: none;
+  /* border-radius: 4px; */
   padding: 8px 10px;
   resize: none;
   overflow: hidden;
@@ -681,7 +709,19 @@ svg.react-flow__connectionline {
   field-sizing: content;
 }
 
-/* Handle styling */
+/* Gdy node jest zaznaczony I textarea jest aktywna — ukryj outline tekstarea,
+   bo ramka kontenera (.dialogue-node) już daje sygnał wizualny */
+.react-flow__node.selected .dialogue-node .node-text-edit {
+    border: 2px solid var(--interactive-accent) !important;
+    outline: none !important;
+}
+
+/* ─────────────────────────────────────────────────────
+   DIALOGUE NODE — handles (punkty połączeń)
+   Małe kółka na krawędziach noda do przeciągania krawędzi.
+   .react-flow__handle-source — handle wyjściowy (na dole),
+   z-index:1 żeby był klikalny ponad tekstem.
+───────────────────────────────────────────────────── */
 .dialogue-node .react-flow__handle {
   width: 8px;
   height: 8px;
@@ -693,7 +733,11 @@ svg.react-flow__connectionline {
   z-index: 1;
 }
 
-/* ChoiceEdge label */
+/* ─────────────────────────────────────────────────────
+   CHOICE EDGE — etykieta krawędzi
+   Pływający kontener na środku krawędzi między nodami.
+   Zawiera tekst wyboru lub input podczas edycji.
+───────────────────────────────────────────────────── */
 .choice-edge-label {
   font-size: 12px;
   background: var(--background-primary);
@@ -701,6 +745,8 @@ svg.react-flow__connectionline {
   padding: 2px 4px;
 }
 
+/* Tekst etykiety — tryb czytania. min-width i display:inline-block
+   zapewniają klikalny obszar nawet gdy tekst jest pusty. */
 .choice-edge-label .choice-edge-text {
   cursor: pointer;
   color: var(--text-normal);
@@ -714,23 +760,51 @@ svg.react-flow__connectionline {
   background: var(--background-modifier-hover);
 }
 
+
+
+/* Zaznaczona krawędź — fioletowy outline na kontenerze etykiety
 .choice-edge-label.selected {
   outline: 1px solid var(--interactive-accent);
   border-radius: 4px;
 }
 
+/* Zaznaczona krawędź — kolor linii beziera */
+/* .react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--interactive-accent);
+  stroke-width: 2;
+} */
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--interactive-accent) !important;
+}
+
+.react-flow__edge.selected marker path {
+  fill: var(--interactive-accent) !important;
+  /* stroke: var(--interactive-accent) !important; */
+}
+
+/* Input etykiety — tryb edycji (po podwójnym kliknięciu etykiety krawędzi) */
 .choice-edge-label .choice-edge-input {
   font-size: 12px;
   padding: 2px 6px;
-  border: 1px solid var(--interactive-accent);
-  border-radius: 3px;
+  border: none !important;
+  /* border: 1px solid var(--interactive-accent); */
+  /* border-radius: 3px; */
   background: var(--background-primary);
   color: var(--text-normal);
-  outline: none;
-  min-width: 80px;
+  outline: none   !important;
+  /* min-width: 30px; */
+  field-sizing: content;
+  /* width: 100%; */
+  /* dodaje tutaj fioletowy outline gdy input jest aktywny: */
+  outline: 2px solid var(--interactive-accent);
+  border-radius: 4px;
 }
 
-/* Toolbar */
+/* =========================== TOOLBAR =========================== */
+   /* Pasek narzędzi na górze canvasu (dodaj node, cofnij itp.).
+   Używa zmiennych Obsidian — automatycznie dopasowuje się
+   do jasnego/ciemnego motywu. */
+
 .ink-toolbar {
   display: flex;
   gap: 6px;
@@ -755,6 +829,7 @@ svg.react-flow__connectionline {
   background: var(--background-modifier-hover);
 }
 
+/* Disabled — przyciski cofnij/ponów gdy historia jest pusta */
 .ink-toolbar button:disabled {
   opacity: 0.4;
   cursor: not-allowed;

@@ -1,0 +1,9 @@
+{
+  "id": "ink-designer",
+  "name": "Ink Designer",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Visual interactive fiction editor using Ink language",
+  "author": "Jakub",
+  "main": "main.js"
+}
