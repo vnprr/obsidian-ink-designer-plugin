@@ -23,6 +23,9 @@ import { DialogueNode } from "./nodes/DialogueNode";
 import { ChoiceEdge } from "./edges/ChoiceEdge";
 import { Toolbar } from "./Toolbar";
 
+const NODE_WIDTH = 200;  // przybliżona szerokość DialogueNode
+const NODE_HEIGHT = 60;  // przybliżona wysokość DialogueNode (pusty tekst)
+
 // MUST be defined at module level — recreating per render breaks xyflow memoization
 const nodeTypes = { dialogue: DialogueNode };
 const edgeTypes = { choice: ChoiceEdge };
@@ -31,6 +34,17 @@ const defaultEdgeOptions = {
   type: "choice",
   markerEnd: { type: MarkerType.ArrowClosed },
 };
+
+/* Helper to calculate node offset based on handle position, so edges connect to the correct point on the node. */
+function getNodeOffset(sourcePosition: Position | null | undefined): { x: number; y: number } {
+  switch (sourcePosition) {
+    case Position.Bottom: return { x: -NODE_WIDTH / 2, y: 0 };
+    case Position.Top:    return { x: -NODE_WIDTH / 2, y: -NODE_HEIGHT };
+    case Position.Right:  return { x: 0,               y: -NODE_HEIGHT / 2 };
+    case Position.Left:   return { x: -NODE_WIDTH,     y: -NODE_HEIGHT / 2 };
+    default:              return { x: -NODE_WIDTH / 2, y: 0 };
+  }
+}
 
 // Given source handle position, pick a sensible default target handle on the opposite side
 function getDefaultTargetHandle(sourcePosition: Position | null | undefined): string {
@@ -212,8 +226,20 @@ export function StoryCanvas({ initialNodes, initialEdges, meta, onSave }: StoryC
         ? event.changedTouches[0].clientY
         : event.clientY;
 
-      const position = instance.screenToFlowPosition({ x: clientX, y: clientY });
+      // const position = instance.screenToFlowPosition({ x: clientX, y: clientY });
 
+      const rawPosition = instance.screenToFlowPosition({x: clientX, y: clientY});
+      const offset = getNodeOffset(connectionState.fromHandle.position);
+      const position = {
+        x: rawPosition.x + offset.x,
+        y: rawPosition.y + offset.y,
+      };
+
+      // const newNodeId = `node-${Date.now()}`;
+      // const newNode: Node = {
+      //   id: newNodeId,
+      //   type: "dialogue",
+      //   position,
       const newNodeId = `node-${Date.now()}`;
       const newNode: Node = {
         id: newNodeId,
@@ -262,6 +288,9 @@ export function StoryCanvas({ initialNodes, initialEdges, meta, onSave }: StoryC
     reactFlowRef.current = instance;
   }, []);
 
+  /* Double-click on empty space to add a new node 
+      - only if double-clicked directly on the pane, not on a node or edge
+  */
   const onPaneDoubleClick = useCallback(
     (event: React.MouseEvent) => {
       const target = event.target as HTMLElement;
@@ -269,7 +298,8 @@ export function StoryCanvas({ initialNodes, initialEdges, meta, onSave }: StoryC
       const instance = reactFlowRef.current;
       if (!instance) return;
       const position = instance.screenToFlowPosition({ x: event.clientX, y: event.clientY });
-      addNodeAtPosition(position.x, position.y);
+      addNodeAtPosition(position.x - NODE_WIDTH / 2, position.y - NODE_HEIGHT / 2);
+      // addNodeAtPosition(position.x, position.y);
     },
     [addNodeAtPosition],
   );
