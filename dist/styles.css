@@ -649,8 +649,9 @@ svg.react-flow__connectionline {
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;
   padding: 0;
-  min-width: 160px;
-  max-width: 280px;
+  /* width ustawiane przez NODE_WIDTH w DialogueNode.tsx */
+  /* min-width: 160px;
+  max-width: 280px; */
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
 }
 

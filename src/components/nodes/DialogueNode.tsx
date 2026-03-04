@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { NODE_WIDTH, NODE_HEIGHT } from "../../core/nodeConstants";
 
 interface DialogueNodeData {
   text: string;
@@ -56,7 +57,9 @@ export function DialogueNode({ id, data, selected }: NodeProps & { data: Dialogu
   const hasText = (data.text ?? "").length > 0;
 
   return (
-    <div className={`dialogue-node${data.isStart ? " is-start" : ""}`}>
+    <div className={`dialogue-node${data.isStart ? " is-start" : ""}`}
+      style={{ width: NODE_WIDTH }}
+    >
       {/* Top handles */}
       <Handle type="target" position={Position.Top} id="top-target" />
       <Handle type="source" position={Position.Top} id="top-source" />
